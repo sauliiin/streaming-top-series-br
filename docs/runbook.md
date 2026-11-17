@@ -7,8 +7,16 @@
 ```bash
 cd infra/bootstrap
 terraform init
-terraform apply -var 'github_repository=<owner>/streaming-top-series-br'
+terraform apply \
+  -var 'github_repository=<owner>/streaming-top-series-br' \
+  -var "github_subject_prefix=$(gh api repos/<owner>/streaming-top-series-br/actions/oidc/customization/sub --jq .sub_claim_prefix)"
+# Add -var 'existing_github_oidc_provider_arn=arn:aws:iam::<account>:oidc-provider/token.actions.githubusercontent.com'
+# when the account already has a GitHub OIDC provider (only one is allowed per account).
 ```
+
+Newer repositories use GitHub's immutable OIDC subjects (`repo:owner@<id>/name@<id>`). The role trusts
+both that form and the legacy `repo:owner/name` form. Back up `infra/bootstrap/terraform.tfstate` to
+`s3://<state_bucket>/bootstrap/terraform.tfstate`, since this stack keeps its state locally.
 
 Outputs: `state_bucket` and `deploy_role_arn`.
 

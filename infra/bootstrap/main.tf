@@ -48,6 +48,16 @@ variable "existing_github_oidc_provider_arn" {
   default     = ""
 }
 
+variable "github_subject_prefix" {
+  description = <<-EOT
+    Prefix of the OIDC `sub` claim when the repository uses GitHub's immutable subjects, e.g.
+    "repo:owner@<owner_id>/name@<repo_id>" (see GET /repos/{owner}/{repo}/actions/oidc/customization/sub).
+    Empty = only the legacy "repo:owner/name" form is trusted.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "deploy_branch" {
   type    = string
   default = "main"
@@ -60,6 +70,10 @@ locals {
   region            = var.aws_region
   prefix            = var.project
   oidc_provider_arn = var.existing_github_oidc_provider_arn != "" ? var.existing_github_oidc_provider_arn : aws_iam_openid_connect_provider.github[0].arn
+  subject_prefixes  = compact(["repo:${var.github_repository}", var.github_subject_prefix])
+  trusted_subjects = flatten([
+    for prefix in local.subject_prefixes : ["${prefix}:ref:refs/heads/${var.deploy_branch}", "${prefix}:environment:production"]
+  ])
 }
 
 # ---------- Terraform state ----------
@@ -121,10 +135,7 @@ data "aws_iam_policy_document" "github_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
-        "repo:${var.github_repository}:ref:refs/heads/${var.deploy_branch}",
-        "repo:${var.github_repository}:environment:production",
-      ]
+      values   = local.trusted_subjects
     }
   }
 }
