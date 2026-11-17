@@ -1,0 +1,6 @@
+# cp backend.hcl.example backend.hcl   (backend.hcl is git-ignored)
+bucket       = "streaming-top-series-tfstate-<ACCOUNT_ID>" # bootstrap output: state_bucket
+key          = "app/terraform.tfstate"
+region       = "sa-east-1"
+encrypt      = true
+use_lockfile = true

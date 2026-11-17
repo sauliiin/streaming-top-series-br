@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Lint, type-check and test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy
+      - run: pytest --cov=streaming_top_series --cov-report=term-missing
+
+  terraform:
+    name: Terraform fmt and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+      - run: terraform fmt -check -recursive infra
+      - name: Validate application stack
+        working-directory: infra/terraform
+        run: terraform init -backend=false -input=false && terraform validate
+      - name: Validate bootstrap stack
+        working-directory: infra/bootstrap
+        run: terraform init -backend=false -input=false && terraform validate

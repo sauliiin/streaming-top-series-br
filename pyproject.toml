@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "streaming-top-series"
+version = "0.2.0"
+description = "Daily Top 20 of recently aired TV series on Netflix, HBO Max and Prime Video (Brazil), synced to MDBList."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Saulo Hugo Rossi" }]
+requires-python = ">=3.12"
+dependencies = []  # runtime uses the standard library only (boto3 ships with AWS Lambda)
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+aws = ["boto3>=1.35"]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.8", "mypy>=1.13", "boto3>=1.35"]
+
+[project.scripts]
+streaming-top-series = "streaming_top_series.entrypoints.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+addopts = "-ra"
+
+[tool.coverage.run]
+branch = true
+source = ["streaming_top_series"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "N", "BLE", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # allow typographic characters in pt-BR list names
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["N802", "N803"]
+
+[tool.mypy]
+files = ["src"]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true

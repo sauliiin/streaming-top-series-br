@@ -1,0 +1,44 @@
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Publish website
+    if: vars.FEEDS_BASE_URL != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Point the site at the AWS data feeds
+        env:
+          FEEDS_BASE_URL: ${{ vars.FEEDS_BASE_URL }}
+        run: |
+          test -n "$FEEDS_BASE_URL" || { echo "::error::Set the FEEDS_BASE_URL repository variable"; exit 1; }
+          rm -rf web/data
+          sed -i "s#<meta name=\"feeds-base\" content=\"data/\" />#<meta name=\"feeds-base\" content=\"${FEEDS_BASE_URL}\" />#" web/index.html
+          grep -q "content=\"${FEEDS_BASE_URL}\"" web/index.html
+          touch web/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

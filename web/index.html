@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Streammy · Top 20 do streaming no Brasil</title>
+    <meta
+      name="description"
+      content="Os 20 lançamentos de filmes e as 20 séries em alta, com melhor nota no IMDb, na Netflix, na HBO Max e no Prime Video. Atualizado todos os dias."
+    />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)" />
+    <meta property="og:title" content="Streammy · Top 20 do streaming no Brasil" />
+    <meta property="og:description" content="Filmes e séries em destaque na Netflix, HBO Max e Prime Video, atualizado diariamente." />
+    <meta property="og:type" content="website" />
+    <!-- Where the daily JSON feeds live. Local preview: "data/". The Pages workflow injects the CloudFront URL. -->
+    <meta name="feeds-base" content="data/" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' https://image.tmdb.org data:; connect-src 'self' https://*.cloudfront.net; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'self'"
+    />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://image.tmdb.org" crossorigin />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script type="module" src="assets/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Pular para o conteúdo</a>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="#/filmes" aria-label="Streammy, página inicial">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+            <rect x="2" y="2" width="28" height="28" rx="8" />
+            <path d="M13 10.5v11l9-5.5z" />
+          </svg>
+          <span class="brand-name">Streammy</span>
+        </a>
+        <p class="tagline">O que vale assistir agora no streaming brasileiro</p>
+      </div>
+    </header>
+
+    <main id="content" class="container">
+      <section class="hero" aria-labelledby="hero-title">
+        <h1 id="hero-title">Top 20 do dia em cada serviço</h1>
+        <p class="hero-lead">
+          Lançamentos de filmes e séries com episódios novos na <strong>Netflix</strong>, na
+          <strong>HBO Max</strong> e no <strong>Prime Video</strong>, ranqueados pela nota do IMDb.
+        </p>
+        <p class="updated" id="updated" aria-live="polite">Carregando…</p>
+      </section>
+
+      <div class="toolbar">
+        <div class="segmented" role="tablist" aria-label="Tipo de conteúdo">
+          <button type="button" role="tab" id="tab-filmes" data-kind="filmes" aria-controls="panel" aria-selected="true">
+            Filmes
+          </button>
+          <button type="button" role="tab" id="tab-series" data-kind="series" aria-controls="panel" aria-selected="false">
+            Séries
+          </button>
+        </div>
+        <div class="chips" role="group" aria-label="Filtrar por serviço">
+          <button type="button" class="chip" data-provider="all" aria-pressed="true">Todos</button>
+          <button type="button" class="chip" data-provider="netflix" aria-pressed="false">
+            <span class="dot dot-netflix" aria-hidden="true"></span>Netflix
+          </button>
+          <button type="button" class="chip" data-provider="hbo" aria-pressed="false">
+            <span class="dot dot-hbo" aria-hidden="true"></span>HBO Max
+          </button>
+          <button type="button" class="chip" data-provider="prime" aria-pressed="false">
+            <span class="dot dot-prime" aria-hidden="true"></span>Prime Video
+          </button>
+        </div>
+      </div>
+
+      <p class="criteria" id="criteria"></p>
+
+      <div id="panel" role="tabpanel" aria-labelledby="tab-filmes" tabindex="-1"></div>
+
+      <noscript>
+        <p class="notice">Ative o JavaScript para ver os rankings atualizados.</p>
+      </noscript>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p>
+          Atualizado automaticamente todas as manhãs. Notas:
+          <a href="https://www.imdb.com/" rel="noopener" target="_blank">IMDb</a> (com o TMDB como alternativa).
+          Disponibilidade: <a href="https://www.justwatch.com/br" rel="noopener" target="_blank">JustWatch</a> via
+          <a href="https://www.themoviedb.org/" rel="noopener" target="_blank">TMDB</a>.
+        </p>
+        <p class="fineprint">
+          Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. Marcas e pôsteres pertencem
+          aos respectivos titulares.
+        </p>
+      </div>
+    </footer>
+
+    <template id="card-template">
+      <li class="card">
+        <a class="card-link" target="_blank" rel="noopener">
+          <div class="poster">
+            <img loading="lazy" decoding="async" width="342" height="513" alt="" />
+            <span class="poster-fallback" aria-hidden="true"></span>
+            <span class="rank"></span>
+          </div>
+          <div class="card-body">
+            <h3 class="card-title"></h3>
+            <p class="card-meta"><span class="card-date"></span><span class="card-label"></span></p>
+            <p class="score"><span class="score-source"></span><span class="score-value"></span></p>
+          </div>
+        </a>
+      </li>
+    </template>
+  </body>
+</html>

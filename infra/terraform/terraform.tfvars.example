@@ -1,0 +1,10 @@
+# cp terraform.tfvars.example terraform.tfvars   (terraform.tfvars is git-ignored)
+aws_region  = "sa-east-1"
+alert_email = ""
+
+app_env = {
+  TOP_N          = "20"
+  MIN_VOTE       = "6.0"
+  MIN_VOTE_COUNT = "0" # e.g. "10" to drop scores inflated by a handful of votes
+  # DRY_RUN      = "true" # recommended for the first days: log the diff only
+}
