@@ -61,6 +61,13 @@ class MdblistListRepositoryTest(unittest.TestCase):
         repository.add(ListRef(5, "StreammyMovies"), [1])
         self.assertEqual(http.calls[-1], ("POST", "/lists/5/items/add", {"movies": [{"tmdb": 1}]}))
 
+    def test_user_lists_are_fetched_once_and_shared_between_repositories(self):
+        http = FakeHttp({("GET", "/lists/user"): [{"id": 1, "name": "A", "slug": "a", "type": "static"}]})
+        cache = {}
+        MdblistListRepository(http, "shows", user_lists_cache=cache).ensure_list("A", dry_run=True)
+        MdblistListRepository(http, "movies", user_lists_cache=cache).ensure_list("A", dry_run=True)
+        self.assertEqual(len([c for c in http.calls if c[1] == "/lists/user"]), 1)
+
     def test_slugify_strips_accents_and_symbols(self):
         self.assertEqual(slugify(LIST_NAME), LIST_SLUG)
 

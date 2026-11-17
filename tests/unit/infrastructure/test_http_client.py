@@ -57,6 +57,29 @@ class JsonHttpClientTest(unittest.TestCase):
         self.assertIsNone(ctx.exception.__cause__)
         self.assertTrue(ctx.exception.__suppress_context__)
 
+    def test_observer_reports_retries_and_slow_requests_without_secrets(self):
+        events = []
+        ticks = iter([0.0, 10.0, 17.5])  # 1st attempt fails (HTTP 503), 2nd succeeds after 7.5 s
+
+        def opener(request, timeout):
+            if len(events) == 0:
+                raise http_error(request.full_url, 503, b"busy")
+            return FakeResponse(b"{}")
+
+        client = JsonHttpClient(
+            "https://api.example",
+            default_params={"apikey": SECRET},
+            opener=opener,
+            sleep=lambda s: None,
+            clock=lambda: next(ticks),
+            observer=lambda *event: events.append(event),
+        )
+        client.get("/lists/user")
+        self.assertEqual([e[0] for e in events], ["http_retry", "http_slow"])
+        self.assertEqual(events[0][3]["status"], 503)
+        self.assertEqual(events[1][3]["seconds"], 7.5)
+        self.assertNotIn(SECRET, repr(events))
+
 
 if __name__ == "__main__":
     unittest.main()

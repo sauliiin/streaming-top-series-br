@@ -17,6 +17,10 @@ from typing import Any
 
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 MAX_BACKOFF_SECONDS = 30.0
+SLOW_REQUEST_SECONDS = 5.0
+
+# (event, method, path, details) -> None. Never receives the URL, so secrets cannot leak into logs.
+HttpObserver = Callable[[str, str, str, dict[str, Any]], None]
 
 
 class HttpError(RuntimeError):
@@ -37,6 +41,8 @@ class JsonHttpClient:
         backoff: float = 1.0,
         sleep: Callable[[float], None] = time.sleep,
         opener: Callable[..., Any] = urllib.request.urlopen,
+        observer: HttpObserver | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._default_params = dict(default_params or {})
@@ -46,6 +52,8 @@ class JsonHttpClient:
         self._backoff = backoff
         self._sleep = sleep
         self._opener = opener
+        self._observer = observer
+        self._clock = clock
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         return self.request("GET", path, params=params)
@@ -72,20 +80,30 @@ class JsonHttpClient:
         delay = self._backoff
         for attempt in range(self._max_retries + 1):
             request = urllib.request.Request(url, data=body, headers=headers, method=method)
+            started = self._clock()
             try:
                 with self._opener(request, timeout=self._timeout) as response:
                     raw = response.read().decode("utf-8")
+                elapsed = self._clock() - started
+                if elapsed >= SLOW_REQUEST_SECONDS:
+                    self._notify("http_slow", method, path, seconds=round(elapsed, 1), attempt=attempt)
                 return json.loads(raw) if raw else None
             except urllib.error.HTTPError as exc:
                 with exc:
                     detail = exc.read().decode("utf-8", errors="replace")[:300]
                 if exc.code in RETRYABLE_STATUS and attempt < self._max_retries:
+                    self._notify("http_retry", method, path, status=exc.code, attempt=attempt, wait=delay)
                     self._sleep(delay)
                     delay = min(delay * 2, MAX_BACKOFF_SECONDS)
                     continue
                 raise HttpError(method, path, exc.code, detail) from None
             except (urllib.error.URLError, TimeoutError) as exc:
                 if attempt < self._max_retries:
+                    error_type = type(getattr(exc, "reason", exc)).__name__
+                    seconds = round(self._clock() - started, 1)
+                    self._notify(
+                        "http_retry", method, path, error=error_type, seconds=seconds, attempt=attempt, wait=delay
+                    )
                     self._sleep(delay)
                     delay = min(delay * 2, MAX_BACKOFF_SECONDS)
                     continue
@@ -94,3 +112,7 @@ class JsonHttpClient:
             except json.JSONDecodeError:
                 raise HttpError(method, path, None, "response is not valid JSON") from None
         raise AssertionError("unreachable")
+
+    def _notify(self, event: str, method: str, path: str, **details: Any) -> None:
+        if self._observer:
+            self._observer(event, method, path, details)

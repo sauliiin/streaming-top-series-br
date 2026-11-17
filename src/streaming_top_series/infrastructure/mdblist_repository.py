@@ -18,6 +18,10 @@ from ..application.ports import ListRef
 
 MDBLIST_BASE_URL = "https://api.mdblist.com"
 MDBLIST_WEB_URL = "https://mdblist.com"
+# Observed from AWS: MDBList sometimes never answers the first attempt, while an immediate retry
+# succeeds in ~1 s. Give up early and retry instead of waiting on a stalled connection.
+MDBLIST_TIMEOUT_SECONDS = 20.0
+MDBLIST_MAX_RETRIES = 5
 MediaType = Literal["shows", "movies"]
 
 
@@ -48,16 +52,30 @@ def tmdb_id_of(item: dict[str, Any]) -> int | None:
 
 class MdblistListRepository:
     def __init__(
-        self, http: HttpClient, media_type: MediaType = "shows", *, batch_size: int = 100, page_size: int = 100
+        self,
+        http: HttpClient,
+        media_type: MediaType = "shows",
+        *,
+        batch_size: int = 100,
+        page_size: int = 100,
+        user_lists_cache: dict[str, Any] | None = None,
     ) -> None:
         self._http = http
+        # Shared between the series and movie repositories: GET /lists/user once per run.
+        self._user_lists_cache = user_lists_cache if user_lists_cache is not None else {}
         self._media_type = media_type
         self._batch_size = batch_size
         self._page_size = page_size
 
-    def find_list(self, name: str) -> dict[str, Any] | None:
+    def _user_lists(self, *, refresh: bool = False) -> list[dict[str, Any]]:
+        if refresh or "lists" not in self._user_lists_cache:
+            self._user_lists_cache["lists"] = self._http.get("/lists/user") or []
+        lists: list[dict[str, Any]] = self._user_lists_cache["lists"]
+        return lists
+
+    def find_list(self, name: str, *, refresh: bool = False) -> dict[str, Any] | None:
         slug = slugify(name)
-        user_lists = self._http.get("/lists/user") or []
+        user_lists = self._user_lists(refresh=refresh)
         matches = [
             lst
             for lst in user_lists
@@ -81,7 +99,7 @@ class MdblistListRepository:
         created = self._http.post("/lists/user/add", {"name": name, "private": False}) or {}
         if "id" not in created:
             # Some API versions only return a status payload; read the list back to get its id.
-            created = self.find_list(name) or {}
+            created = self.find_list(name, refresh=True) or {}
         if "id" not in created:
             raise RuntimeError(f"MDBList did not return an id when creating list {name!r}")
         return ListRef(
@@ -89,7 +107,7 @@ class MdblistListRepository:
             name=name,
             slug=created.get("slug") or slugify(name),
             created=True,
-            url=list_url(created) or list_url(self.find_list(name) or {}),
+            url=list_url(created) or list_url(self.find_list(name, refresh=True) or {}),
         )
 
     def current_items(self, ref: ListRef) -> set[int]:

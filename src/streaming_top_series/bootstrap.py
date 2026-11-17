@@ -19,6 +19,8 @@ from .infrastructure.http_client import JsonHttpClient
 from .infrastructure.imdb_ratings import ImdbDatasetRatings
 from .infrastructure.mdblist_repository import (
     MDBLIST_BASE_URL,
+    MDBLIST_MAX_RETRIES,
+    MDBLIST_TIMEOUT_SECONDS,
     MdblistListRepository,
     MediaType,
     OfflineListRepository,
@@ -53,17 +55,34 @@ def build_services(
 ) -> Services:
     credentials = resolve_secrets(env, SECRET_NAMES)
 
+    def observe(event: str, method: str, path: str, details: dict[str, object]) -> None:
+        log(event, level="WARNING", method=method, path=path, **details)
+
     if credentials.get("TMDB_READ_TOKEN"):
-        tmdb_http = JsonHttpClient(TMDB_BASE_URL, headers={"Authorization": f"Bearer {credentials['TMDB_READ_TOKEN']}"})
+        tmdb_http = JsonHttpClient(
+            TMDB_BASE_URL, headers={"Authorization": f"Bearer {credentials['TMDB_READ_TOKEN']}"}, observer=observe
+        )
     elif credentials.get("TMDB_API_KEY"):
-        tmdb_http = JsonHttpClient(TMDB_BASE_URL, default_params={"api_key": credentials["TMDB_API_KEY"]})
+        tmdb_http = JsonHttpClient(
+            TMDB_BASE_URL, default_params={"api_key": credentials["TMDB_API_KEY"]}, observer=observe
+        )
     else:
         raise ConfigurationError("Set TMDB_API_KEY or TMDB_READ_TOKEN (or the *_PARAM variant pointing to SSM).")
 
+    mdblist_http: JsonHttpClient | None = None
+    if credentials.get("MDBLIST_API_KEY"):
+        mdblist_http = JsonHttpClient(
+            MDBLIST_BASE_URL,
+            default_params={"apikey": credentials["MDBLIST_API_KEY"]},
+            timeout=MDBLIST_TIMEOUT_SECONDS,
+            max_retries=MDBLIST_MAX_RETRIES,
+            observer=observe,
+        )
+    user_lists_cache: dict[str, object] = {}
+
     def list_repository(media_type: MediaType) -> ListRepository:
-        if credentials.get("MDBLIST_API_KEY"):
-            http = JsonHttpClient(MDBLIST_BASE_URL, default_params={"apikey": credentials["MDBLIST_API_KEY"]})
-            return MdblistListRepository(http, media_type)
+        if mdblist_http:
+            return MdblistListRepository(mdblist_http, media_type, user_lists_cache=user_lists_cache)
         if dry_run:
             log("mdblist_offline", level="WARNING", reason="MDBLIST_API_KEY not set; dry-run against empty lists")
             return OfflineListRepository()
