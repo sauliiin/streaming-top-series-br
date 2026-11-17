@@ -42,6 +42,12 @@ variable "github_repository" {
   type        = string
 }
 
+variable "existing_github_oidc_provider_arn" {
+  description = "ARN of a GitHub OIDC provider that already exists in the account (only one is allowed). Empty = create it."
+  type        = string
+  default     = ""
+}
+
 variable "deploy_branch" {
   type    = string
   default = "main"
@@ -50,9 +56,10 @@ variable "deploy_branch" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  account_id = data.aws_caller_identity.current.account_id
-  region     = var.aws_region
-  prefix     = var.project
+  account_id        = data.aws_caller_identity.current.account_id
+  region            = var.aws_region
+  prefix            = var.project
+  oidc_provider_arn = var.existing_github_oidc_provider_arn != "" ? var.existing_github_oidc_provider_arn : aws_iam_openid_connect_provider.github[0].arn
 }
 
 # ---------- Terraform state ----------
@@ -92,6 +99,8 @@ resource "aws_s3_bucket_public_access_block" "state" {
 # ---------- GitHub Actions OIDC ----------
 
 resource "aws_iam_openid_connect_provider" "github" {
+  count = var.existing_github_oidc_provider_arn == "" ? 1 : 0
+
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
@@ -102,7 +111,7 @@ data "aws_iam_policy_document" "github_trust" {
     actions = ["sts:AssumeRoleWithWebIdentity"]
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
+      identifiers = [local.oidc_provider_arn]
     }
     condition {
       test     = "StringEquals"
